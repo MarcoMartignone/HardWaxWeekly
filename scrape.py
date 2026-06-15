@@ -14,6 +14,13 @@ UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML,
 
 def fetch(url: str) -> str:
     r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    if r.status_code == 403 and "not in allowlist" in r.text.lower():
+        raise SystemExit(
+            f"Network egress blocked for {url}: {r.text.strip()}\n"
+            "This is an environment network-policy issue, not a Hard Wax block. "
+            "Add hardwax.com, accounts.spotify.com and api.spotify.com to the "
+            "environment's egress allowlist, then re-run the routine."
+        )
     r.raise_for_status()
     return r.text
 
