@@ -14,6 +14,19 @@ UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML,
 
 def fetch(url: str) -> str:
     r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    # The remote execution environment routes outbound traffic through an
+    # egress proxy. When a host isn't allowlisted the proxy returns 403 with a
+    # body like "Host not in allowlist: <host>. Add this host to your network
+    # egress settings to allow access." Surface that clearly instead of a raw
+    # HTTPError traceback so the failure is actionable.
+    if r.status_code == 403 and "not in allowlist" in r.text.lower():
+        raise SystemExit(
+            f"Network egress blocked: {r.text.strip()}\n"
+            "This routine needs outbound access to hardwax.com, media.hardwax.com, "
+            "accounts.spotify.com and api.spotify.com. Add these hosts to the "
+            "environment's network egress allowlist. See "
+            "https://code.claude.com/docs/en/claude-code-on-the-web"
+        )
     r.raise_for_status()
     return r.text
 

@@ -27,6 +27,21 @@ def _basic_auth_header() -> dict:
     return {"Authorization": "Basic " + base64.b64encode(creds).decode()}
 
 
+def _check_egress(r: requests.Response) -> None:
+    """Surface the remote environment's egress-proxy block as a clear, actionable
+    error instead of an opaque 403. The proxy returns 403 with a body like
+    "Host not in allowlist: <host>. Add this host to your network egress
+    settings to allow access." when a host isn't allowlisted."""
+    if r.status_code == 403 and "not in allowlist" in r.text.lower():
+        raise SystemExit(
+            f"Network egress blocked: {r.text.strip()}\n"
+            "This routine needs outbound access to accounts.spotify.com and "
+            "api.spotify.com (plus hardwax.com and media.hardwax.com for scraping). "
+            "Add these hosts to the environment's network egress allowlist. See "
+            "https://code.claude.com/docs/en/claude-code-on-the-web"
+        )
+
+
 def exchange_code_for_tokens(code: str) -> dict:
     r = requests.post(
         TOKEN_URL,
@@ -45,6 +60,7 @@ def refresh_access_token(refresh_token: str) -> dict:
         data={"grant_type": "refresh_token", "refresh_token": refresh_token},
         timeout=30,
     )
+    _check_egress(r)
     r.raise_for_status()
     return r.json()
 
