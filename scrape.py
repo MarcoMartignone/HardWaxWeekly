@@ -13,7 +13,30 @@ UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML,
 
 
 def fetch(url: str) -> str:
-    r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    try:
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    except requests.exceptions.ProxyError as e:
+        # The outbound egress proxy refused the CONNECT (typically a 403 from
+        # the policy gateway because hardwax.com is not on the network
+        # allowlist for this environment). This is not retryable from here.
+        sys.exit(
+            "ERROR: outbound request to hardwax.com was blocked by the network "
+            "egress policy (proxy refused CONNECT).\n"
+            f"  url: {url}\n"
+            f"  detail: {e}\n"
+            "Fix: add hardwax.com to this environment's network allowlist. "
+            "See https://code.claude.com/docs/en/claude-code-on-the-web"
+        )
+    if r.status_code == 403:
+        # Could be the egress gateway or hardwax's own anti-bot. Either way the
+        # scrape cannot proceed; surface it instead of a parse error downstream.
+        sys.exit(
+            f"ERROR: hardwax.com returned 403 Forbidden for {url}.\n"
+            "This is usually the network egress policy blocking the host, or an "
+            "anti-bot block. The scrape cannot proceed.\n"
+            "If it is the egress policy, add hardwax.com to this environment's "
+            "network allowlist: https://code.claude.com/docs/en/claude-code-on-the-web"
+        )
     r.raise_for_status()
     return r.text
 
