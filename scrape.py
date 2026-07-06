@@ -13,7 +13,21 @@ UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML,
 
 
 def fetch(url: str) -> str:
-    r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    try:
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    except requests.exceptions.ProxyError as e:
+        # In sandboxed/egress-restricted environments the outbound proxy may
+        # reject the host with a 403 (organization network policy denial).
+        # Surface a clear, actionable message instead of a raw traceback.
+        host = requests.utils.urlparse(url).hostname or url
+        print(
+            f"ERROR: outbound request to {host} was blocked by the network "
+            f"egress proxy (policy denial). This host must be allowlisted in "
+            f"the environment's network policy before the routine can run. "
+            f"Underlying error: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     r.raise_for_status()
     return r.text
 
