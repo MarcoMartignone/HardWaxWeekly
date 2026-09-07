@@ -13,7 +13,21 @@ UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML,
 
 
 def fetch(url: str) -> str:
-    r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    try:
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    except requests.exceptions.ProxyError as e:
+        # In sandboxed/remote environments outbound HTTPS goes through an egress
+        # proxy that enforces a network policy. A 403 on the CONNECT tunnel means
+        # this host is not on the allow-list — not a bug we can route around.
+        host = url.split("/")[2] if "//" in url else url
+        print(
+            f"ERROR: network policy blocked '{host}'. The egress proxy denied the "
+            f"connection (403/407 on CONNECT). This routine needs outbound HTTPS to "
+            f"hardwax.com and *.spotify.com; allow those hosts in the environment's "
+            f"network policy and re-run. Underlying error: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     r.raise_for_status()
     return r.text
 

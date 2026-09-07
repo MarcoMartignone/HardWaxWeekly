@@ -11,6 +11,7 @@ import os
 import sys
 from difflib import SequenceMatcher
 
+import requests
 from dotenv import load_dotenv
 
 import spotify_client as sp
@@ -69,7 +70,20 @@ def main():
     releases = load_releases(source)
     print(f"# {len(releases)} releases to process", file=sys.stderr)
 
-    existing = sp.playlist_track_uris(playlist_id)
+    try:
+        existing = sp.playlist_track_uris(playlist_id)
+    except requests.exceptions.ProxyError as e:
+        # Outbound HTTPS is denied by the environment's egress policy. Spotify's
+        # API hosts (accounts.spotify.com / api.spotify.com) are not allow-listed;
+        # this is not something we can route around from inside the run.
+        print(
+            "ERROR: network policy blocked Spotify. The egress proxy denied the "
+            "connection (403/407 on CONNECT) to accounts.spotify.com / "
+            "api.spotify.com. Allow *.spotify.com in the environment's network "
+            f"policy and re-run. Underlying error: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     print(f"# playlist already has {len(existing)} tracks", file=sys.stderr)
 
     to_add: list[str] = []
