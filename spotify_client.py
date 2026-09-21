@@ -56,7 +56,17 @@ def get_access_token() -> str:
     refresh = os.getenv("SPOTIFY_REFRESH_TOKEN", "")
     if not refresh:
         raise RuntimeError("SPOTIFY_REFRESH_TOKEN missing. Run: python auth.py")
-    data = refresh_access_token(refresh)
+    try:
+        data = refresh_access_token(refresh)
+    except requests.exceptions.ProxyError as e:
+        # Sandboxed/proxied environments may block accounts.spotify.com
+        # (403 on CONNECT). Not a code bug and cannot be retried around.
+        raise RuntimeError(
+            "could not reach accounts.spotify.com — the network egress proxy "
+            "denied the connection (likely a 403 policy block). Allow "
+            "accounts.spotify.com and api.spotify.com in this environment's "
+            f"network policy and re-run. detail: {e}"
+        ) from e
     _access_token = data["access_token"]
     _access_token_expires_at = time.time() + int(data.get("expires_in", 3600))
     return _access_token

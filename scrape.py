@@ -13,7 +13,20 @@ UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML,
 
 
 def fetch(url: str) -> str:
-    r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    try:
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    except requests.exceptions.ProxyError as e:
+        # In sandboxed/proxied environments the egress policy may block
+        # hardwax.com (403 on CONNECT). This is not a code bug and cannot be
+        # retried around — surface it clearly instead of a raw traceback.
+        print(
+            "ERROR: could not reach hardwax.com — the network egress proxy "
+            "denied the connection (likely a 403 policy block). Allow "
+            "hardwax.com in this environment's network policy and re-run.\n"
+            f"  detail: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     r.raise_for_status()
     return r.text
 
