@@ -65,6 +65,25 @@ def main():
         print("ERROR: SPOTIFY_PLAYLIST_ID missing.", file=sys.stderr)
         sys.exit(1)
 
+    # Preflight: confirm the Spotify API is reachable before doing any work.
+    # In network-restricted environments the egress proxy denies the host with
+    # a 403, which would otherwise surface as a confusing mid-run traceback.
+    try:
+        sp.get_access_token()
+    except Exception as e:
+        import requests as _rq
+        if isinstance(e, _rq.exceptions.ProxyError):
+            print(
+                "NETWORK POLICY DENIAL: the egress proxy refused access to the Spotify API "
+                "(accounts.spotify.com).\nThis environment's network policy blocks outbound "
+                "internet access. Reconfigure the Claude Code environment to allow "
+                "accounts.spotify.com and api.spotify.com. See "
+                "https://code.claude.com/docs/en/claude-code-on-the-web .",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        raise
+
     source = sys.argv[1] if len(sys.argv) > 1 else None
     releases = load_releases(source)
     print(f"# {len(releases)} releases to process", file=sys.stderr)

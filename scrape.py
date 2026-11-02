@@ -13,7 +13,21 @@ UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML,
 
 
 def fetch(url: str) -> str:
-    r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    try:
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    except requests.exceptions.ProxyError as e:
+        host = re.sub(r"^https?://", "", url).split("/", 1)[0]
+        print(
+            f"NETWORK POLICY DENIAL: the egress proxy refused outbound access to '{host}'.\n"
+            f"This weekly sync needs internet access to hardwax.com and the Spotify API, "
+            f"but the environment's network policy blocks it (403 on CONNECT).\n"
+            f"Fix: reconfigure the Claude Code environment with a network policy that allows "
+            f"hardwax.com, accounts.spotify.com and api.spotify.com. See "
+            f"https://code.claude.com/docs/en/claude-code-on-the-web for network policy options.\n"
+            f"(underlying error: {e})",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     r.raise_for_status()
     return r.text
 
